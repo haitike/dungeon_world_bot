@@ -15,7 +15,6 @@ try:
 except IOError:
   pass
 
-
 #  main():
 from dungeon_world.bot import Bot
 bot = Bot()
