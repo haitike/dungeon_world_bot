@@ -1,52 +1,31 @@
 from gettext import gettext as _
 import os
-import logging
 import pytz
-import configparser
 from datetime import datetime
 from telegram import Updater
 from telegram.error import TelegramError
 from pytz import timezone
-from pymongo import MongoClient, ASCENDING, DESCENDING
-from dungeon_world.interface import Interface
 
-CONFIGFILE_PATH = "data/config.cfg"
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("bot_log")
+import dungeon
+from dungeon.interface import Interface
 
 class Bot(object):
     translations = {}
     bot = None
 
     def __init__(self):
-        self.config = configparser.ConfigParser()
-        self.config.read( CONFIGFILE_PATH )
-
-        client = MongoClient(self.get_env_conf("MONGO_URL", None))
-        self.db = client[self.get_bot_conf("DB_NAME")]
-        #self.db.create_index("collection", "key") # REMEMBER TO ADD INDEXES FOR SPEED
-
-        self.updater = Updater(token=self.get_bot_conf("TOKEN"))
+        self.updater = Updater(token=dungeon.get_bot_conf("TOKEN"))
         self.dispatcher = self.updater.dispatcher
         self.add_handlers()
 
         self.interface = Interface()
 
         try:
-            self.tzinfo = timezone(self.get_bot_conf("TIMEZONE"))
+            self.tzinfo = timezone(dungeon.get_bot_conf("TIMEZONE"))
         except:
             self.tzinfo = pytz.utc
 
         # i18n BLOCK (see dungeon world commit 66 / haibot commits)
-
-    def get_bot_conf(self, value):
-        return self.config["bot"][value]
-
-    def get_env_conf(self, value, default_value=None):
-        if default_value:
-            return os.environ.get(self.config["env"][value], default_value)
-        else:
-            return os.environ.get(self.config["env"][value])
 
     def start_polling_loop(self):
         self.disable_webhook()
@@ -56,29 +35,29 @@ class Bot(object):
 
     def start_webhook_server(self):
         self.set_webhook()
-        self.update_queue = self.updater.start_webhook(self.get_env_conf("IP","127.0.0.1"),
-                                                       int(self.get_env_conf("PORT","8080")),
-                                                       self.get_bot_conf("TOKEN"))
+        self.update_queue = self.updater.start_webhook(dungeon.get_env_conf("IP","127.0.0.1"),
+                                                       int(dungeon.get_env_conf("PORT","8080")),
+                                                       dungeon.get_bot_conf("TOKEN"))
         self.updater.idle()
         self.cleaning()
 
     def cleaning(self):
-        logger.info("Finished program.")
+        dungeon.logger.info("Finished program.")
 
     def set_webhook(self):
-        s = self.updater.bot.setWebhook(self.get_bot_conf("WEBHOOK_URL") + "/" + self.get_bot_conf("TOKEN"))
+        s = self.updater.bot.setWebhook(dungeon.get_bot_conf("WEBHOOK_URL") + "/" + dungeon.get_bot_conf("TOKEN"))
         if s:
-            logger.info("webhook setup worked")
+            dungeon.logger.info("webhook setup worked")
         else:
-            logger.warning("webhook setup failed")
+            dungeon.logger.warning("webhook setup failed")
         return s
 
     def disable_webhook(self):
         s = self.updater.bot.setWebhook("")
         if s:
-            logger.info("webhook was disabled")
+            dungeon.logger.info("webhook was disabled")
         else:
-            logger.warning("webhook couldn't be disabled")
+            dungeon.logger.warning("webhook couldn't be disabled")
         return s
 
     def add_handlers(self):
@@ -113,8 +92,8 @@ class Bot(object):
             bot.sendMessage(chat_id=chat.id, text=text)
             return True
         except TelegramError as e:
-            logger.warning("Message sending error to %s [%d] [%s] (TelegramError: %s)" % (chat.name, chat.id, chat.type, e))
+            dungeon.logger.warning("Message sending error to %s [%d] [%s] (TelegramError: %s)" % (chat.name, chat.id, chat.type, e))
             return False
         except:
-            logger.warning("Message sending error to %s [%d] [%s]" % (chat.name, chat.id, chat.type))
+            dungeon.logger.warning("Message sending error to %s [%d] [%s]" % (chat.name, chat.id, chat.type))
             return False

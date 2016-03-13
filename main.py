@@ -1,4 +1,4 @@
-from dungeon_world.bot import Bot
+from dungeon.bot import Bot
 
 def main():
     bot = Bot()

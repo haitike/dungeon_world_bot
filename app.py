@@ -16,6 +16,6 @@ except IOError:
   pass
 
 #  main():
-from dungeon_world.bot import Bot
+from dungeon.bot import Bot
 bot = Bot()
 bot.start_webhook_server()
