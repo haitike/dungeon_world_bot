@@ -68,7 +68,7 @@ class Bot(object):
 
     def get_chat_info(self, update):
         self.chat = update.message.chat
-        self.user_id = update.message.from_user.id
+        self.user = update.message.from_user/
         self.text = update.message.text
         self.chat_state = self.state.get(self.chat.id, STOPPED)
         self.chat_context = self.context.get(self.chat.id, None)
@@ -85,8 +85,8 @@ class Bot(object):
     def command_exit(self, bot, update):
         self.get_chat_info(update)
         self.send_message(messages.exit[self.chat_state])
-        self.state[self.chat_id] = STOPPED
-        self.context[self.chat_id] = None
+        self.state[self.chat.id] = STOPPED
+        self.context[self.chat.id] = None
 
     def send_message(self, text):
         try:
