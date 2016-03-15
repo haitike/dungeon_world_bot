@@ -1,24 +1,25 @@
-from gettext import gettext as _
-import os
 import pytz
-from datetime import datetime
 from telegram import Updater
 from telegram.error import TelegramError
 from pytz import timezone
 
 import dungeon
-from dungeon.interface import Interface
+from dungeon import messages
+
+STOPPED, NEWPJ, DELPJ, MASTER, DELADV, NEWADV, JOINING, PLAYING = range(8)
 
 class Bot(object):
     translations = {}
     bot = None
 
     def __init__(self):
+        self.state = dict()
+        self.playing_state = dict()
+        self.context = dict()
+
         self.updater = Updater(token=dungeon.get_bot_conf("TOKEN"))
         self.dispatcher = self.updater.dispatcher
         self.add_handlers()
-
-        self.interface = Interface()
 
         try:
             self.tzinfo = timezone(dungeon.get_bot_conf("TIMEZONE"))
@@ -63,37 +64,37 @@ class Bot(object):
     def add_handlers(self):
         self.dispatcher.addTelegramCommandHandler("start", self.command_start)
         self.dispatcher.addTelegramCommandHandler("help", self.command_help)
-        self.dispatcher.addTelegramCommandHandler("time", self.command_time)
-        self.dispatcher.addTelegramMessageHandler(self.command_echo)
-        #self.dispatcher.addUnknownTelegramCommandHandler(self.command_unknown)
-        #self.dispatcher.addErrorHandler(self.error_handle)
+        self.dispatcher.addTelegramCommandHandler("exit", self.command_exit)
+
+    def get_chat_info(self, update):
+        self.chat = update.message.chat
+        self.user_id = update.message.from_user.id
+        self.text = update.message.text
+        self.chat_state = self.state.get(self.chat.id, STOPPED)
+        self.chat_context = self.context.get(self.chat.id, None)
 
     def command_start(self, bot, update):
-        self.send_message(bot, update.message.chat, _("Welcome to Dungeon World Bot."))
+        self.get_chat_info(update)
+        self.send_message(messages.welcome)
+        self.send_message(messages.help[self.chat_state])
 
     def command_help(self, bot, update):
-        self.send_message(bot, update.message.chat, _(
-            """Available Commands:
-            /start - Iniciciate or Restart the bot
-            /help - Show the command list.
-            /time - Bot local time check"""))
+        self.get_chat_info(update)
+        self.send_message(messages.help[self.chat_state])
 
-    def command_time(self, bot , update):
-        utc_date = datetime.utcnow()
-        local_date = pytz.utc.localize(utc_date).astimezone(self.tzinfo)
-        formated_string = local_date.strftime("%d/%m/%y %H:%M")
-        self.send_message(bot, update.message.chat, formated_string)
+    def command_exit(self, bot, update):
+        self.get_chat_info(update)
+        self.send_message(messages.exit[self.chat_state])
+        self.state[self.chat_id] = STOPPED
+        self.context[self.chat_id] = None
 
-    def command_echo(self, bot , update):
-        self.send_message(bot, update.message.chat, update.message.text)
-
-    def send_message(self, bot, chat, text):
+    def send_message(self, text):
         try:
-            bot.sendMessage(chat_id=chat.id, text=text)
+            self.updater.bot.sendMessage(chat_id=self.chat.id, text=text)
             return True
         except TelegramError as e:
-            dungeon.logger.warning("Message sending error to %s [%d] [%s] (TelegramError: %s)" % (chat.name, chat.id, chat.type, e))
+            dungeon.logger.warning("Message sending error to %s [%d] [%s] (TelegramError: %s)" % (self.chat.name, self.chat.id, self.chat.type, e))
             return False
         except:
-            dungeon.logger.warning("Message sending error to %s [%d] [%s]" % (chat.name, chat.id, chat.type))
+            dungeon.logger.warning("Message sending error to %s [%d] [%s]" % (self.chat.name, self.chat.id, self.chat.type))
             return False
