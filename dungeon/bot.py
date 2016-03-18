@@ -1,12 +1,10 @@
 import pytz
+from pytz import timezone
 from telegram import Updater
 from telegram.error import TelegramError
-from pytz import timezone
 
 import dungeon
-from dungeon import messages
-
-STOPPED, NEWPJ, DELPJ, MASTER, DELADV, NEWADV, JOINING, PLAYING = range(8)
+from dungeon import messages, const
 
 class Bot(object):
     translations = {}
@@ -65,18 +63,25 @@ class Bot(object):
         self.dispatcher.addTelegramCommandHandler("start", self.command_start)
         self.dispatcher.addTelegramCommandHandler("help", self.command_help)
         self.dispatcher.addTelegramCommandHandler("exit", self.command_exit)
+        self.dispatcher.addTelegramCommandHandler("pj", self.command_pj)
+        self.dispatcher.addTelegramCommandHandler("master", self.command_master)
+        self.dispatcher.addTelegramCommandHandler("play", self.command_play)
 
     def get_chat_info(self, update):
         self.chat = update.message.chat
         self.user = update.message.from_user
         self.text = update.message.text
-        self.chat_state = self.state.get(self.chat.id, STOPPED)
+        self.chat_state = self.state.get(self.chat.id, const.STOPPED)
         self.chat_context = self.context.get(self.chat.id, None)
 
     def command_start(self, bot, update):
         self.get_chat_info(update)
-        self.send_message(messages.welcome)
-        self.send_message(messages.help[self.chat_state])
+        if self.chat_state == const.STOPPED:
+            self.state[self.chat.id] = const.STOPPED
+            self.send_message(messages.welcome)
+            self.send_message(messages.help[self.chat_state])
+        else:
+            self.send_message(messages.already_started[self.chat_state])
 
     def command_help(self, bot, update):
         self.get_chat_info(update)
@@ -84,9 +89,26 @@ class Bot(object):
 
     def command_exit(self, bot, update):
         self.get_chat_info(update)
-        self.send_message(messages.exit[self.chat_state])
-        self.state[self.chat.id] = STOPPED
-        self.context[self.chat.id] = None
+        if self.chat_state != const.STOPPED:
+            self.send_message(messages.exit[self.chat_state])
+            self.state[self.chat.id] = const.STOPPED
+            self.context[self.chat.id] = None
+        else:
+            self.send_message(messages.no_exit)
+
+    def command_pj(self, bot, update):
+        self.get_chat_info(update)
+        if self.chat_state == const.STOPPED:
+            self.state[self.chat.id] = const.NEWPJ
+            self.send_message("guay")
+        else:
+            self.send_message("ya")
+
+    def command_master(self, bot, update):
+        pass
+
+    def command_play(self, bot, update):
+        pass
 
     def send_message(self, text):
         try:
