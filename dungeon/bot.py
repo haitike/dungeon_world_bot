@@ -5,13 +5,13 @@ from telegram.error import TelegramError
 
 import dungeon
 from dungeon import messages, const
+from dungeon import db
 
 class Bot(object):
     translations = {}
     bot = None
 
     def __init__(self):
-        self.state = dict()
         self.playing_state = dict()
         self.context = dict()
 
@@ -71,35 +71,39 @@ class Bot(object):
         self.chat = update.message.chat
         self.user = update.message.from_user
         self.text = update.message.text
-        self.chat_state = self.state.get(self.chat.id, const.STOPPED)
-        self.chat_context = self.context.get(self.chat.id, None)
+
+        self.chat_data = db.chats.find_one({"_id" : self.chat.id})
+        if not self.chat_data:
+            self.chat_data = {"_id" : self.chat.id, "state" : const.STOPPED, "context": None}
 
     def command_start(self, bot, update):
         self.get_chat_info(update)
-        if self.chat_state == const.STOPPED:
-            self.state[self.chat.id] = const.STOPPED
+        if self.chat_data["state"] == const.STOPPED:
+            self.chat_data["state"] = const.STOPPED
             self.send_message(messages.welcome)
-            self.send_message(messages.help[self.chat_state])
+            self.send_message(messages.help[self.chat_data["state"]])
         else:
-            self.send_message(messages.already_started[self.chat_state])
+            self.send_message(messages.already_started[self.chat_data["state"]])
 
     def command_help(self, bot, update):
         self.get_chat_info(update)
-        self.send_message(messages.help[self.chat_state])
+        self.send_message(messages.help[self.chat_data["state"]])
 
     def command_exit(self, bot, update):
         self.get_chat_info(update)
-        if self.chat_state != const.STOPPED:
-            self.send_message(messages.exit[self.chat_state])
-            self.state[self.chat.id] = const.STOPPED
+        if self.chat_data["state"] != const.STOPPED:
+            self.send_message(messages.exit[self.chat_data["state"]])
+            self.chat_data["state"] = const.STOPPED
+            db.chats.replace_one({"_id":self.chat.id}, self.chat_data, upsert=True )
             self.context[self.chat.id] = None
         else:
             self.send_message(messages.no_exit)
 
     def command_pj(self, bot, update):
         self.get_chat_info(update)
-        if self.chat_state == const.STOPPED:
-            self.state[self.chat.id] = const.NEWPJ
+        if self.chat_data["state"] == const.STOPPED:
+            self.chat_data["state"] = const.NEWPJ
+            db.chats.replace_one({"_id":self.chat.id}, self.chat_data, upsert=True )
             self.send_message("guay")
         else:
             self.send_message("ya")
