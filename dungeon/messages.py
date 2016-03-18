@@ -21,3 +21,5 @@ help[0] += _("Commands (Add help to a command for extra subcommands):\n"
              "/play - Start a new adventure\n"
              "/master - Connect as master to your ongoing adventures\n"
              "/help - Show the chat state and available commands for that state\n")
+
+"/exit"

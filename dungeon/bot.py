@@ -13,7 +13,6 @@ class Bot(object):
 
     def __init__(self):
         self.playing_state = dict()
-        self.context = dict()
 
         self.updater = Updater(token=dungeon.get_bot_conf("TOKEN"))
         self.dispatcher = self.updater.dispatcher
@@ -68,42 +67,45 @@ class Bot(object):
         self.dispatcher.addTelegramCommandHandler("play", self.command_play)
 
     def get_chat_info(self, update):
-        self.chat = update.message.chat
-        self.user = update.message.from_user
-        self.text = update.message.text
+        self.last_chat = update.message.chat
+        chad_id = update.message.chat.id
 
-        self.chat_data = db.chats.find_one({"_id" : self.chat.id})
-        if not self.chat_data:
-            self.chat_data = {"_id" : self.chat.id, "state" : const.STOPPED, "context": None}
+        sender = update.message.from_user
+        text = update.message.text
+        chat_data = db.chats.find_one({"_id" : chad_id})
+        if not chat_data:
+            chat_data = {"_id" : chad_id, "state" : const.STOPPED, "context": None}
+
+        return chat_data, sender, text
 
     def command_start(self, bot, update):
-        self.get_chat_info(update)
-        if self.chat_data["state"] == const.STOPPED:
-            self.chat_data["state"] = const.STOPPED
+        chat, sender, text = self.get_chat_info(update)
+        if chat["state"] == const.STOPPED:
+            chat["state"] = const.STOPPED
             self.send_message(messages.welcome)
-            self.send_message(messages.help[self.chat_data["state"]])
+            self.send_message(messages.help[chat["state"]])
         else:
-            self.send_message(messages.already_started[self.chat_data["state"]])
+            self.send_message(messages.already_started[chat["state"]])
 
     def command_help(self, bot, update):
-        self.get_chat_info(update)
-        self.send_message(messages.help[self.chat_data["state"]])
+        chat, sender, text = self.get_chat_info(update)
+        self.send_message(messages.help[chat["state"]])
 
     def command_exit(self, bot, update):
-        self.get_chat_info(update)
-        if self.chat_data["state"] != const.STOPPED:
-            self.send_message(messages.exit[self.chat_data["state"]])
-            self.chat_data["state"] = const.STOPPED
-            db.chats.replace_one({"_id":self.chat.id}, self.chat_data, upsert=True )
-            self.context[self.chat.id] = None
+        chat, sender, text = self.get_chat_info(update)
+        if chat["state"] != const.STOPPED:
+            self.send_message(messages.exit[chat["state"]])
+            chat["state"] = const.STOPPED
+            db.chats.replace_one({"_id":chat["_id"]}, chat, upsert=True )
+            chat["context"] = None
         else:
             self.send_message(messages.no_exit)
 
     def command_pj(self, bot, update):
-        self.get_chat_info(update)
-        if self.chat_data["state"] == const.STOPPED:
-            self.chat_data["state"] = const.NEWPJ
-            db.chats.replace_one({"_id":self.chat.id}, self.chat_data, upsert=True )
+        chat, sender, text = self.get_chat_info(update)
+        if chat["state"] == const.STOPPED:
+            chat["state"] = const.NEWPJ
+            db.chats.replace_one({"_id":chat["_id"]}, chat, upsert=True )
             self.send_message("guay")
         else:
             self.send_message("ya")
@@ -116,11 +118,17 @@ class Bot(object):
 
     def send_message(self, text):
         try:
-            self.updater.bot.sendMessage(chat_id=self.chat.id, text=text)
+            self.updater.bot.sendMessage(chat_id=self.last_chat.id, text=text)
             return True
         except TelegramError as e:
-            dungeon.logger.warning("Message sending error to %s [%d] [%s] (TelegramError: %s)" % (self.chat.name, self.chat.id, self.chat.type, e))
+            if self.last_chat.type == "private":
+                dungeon.logger.warning("Message sending error to %s [%d] [%s] (TelegramError: %s)" % (self.last_chat.first_name, self.last_chat.id, self.last_chat.type, e))
+            else:
+                dungeon.logger.warning("Message sending error to %s [%d] [%s] (TelegramError: %s)" % (self.last_chat.title, self.last_chat.id, self.last_chat.type, e))
             return False
         except:
-            dungeon.logger.warning("Message sending error to %s [%d] [%s]" % (self.chat.name, self.chat.id, self.chat.type))
+            if self.last_chat.type == "private":
+                dungeon.logger.warning("Message sending error to %s [%d] [%s]" % (self.last_chat.first_name, self.last_chat.id, self.last_chat.type))
+            else:
+                dungeon.logger.warning("Message sending error to %s [%d] [%s]" % (self.last_chat.title, self.last_chat.id, self.last_chat.type))
             return False
